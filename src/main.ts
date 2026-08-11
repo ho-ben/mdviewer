@@ -70,6 +70,9 @@ app.innerHTML = `
           <img class="brand-icon" src="./icon-mark-192.png" alt="" width="38" height="38" />
           <span>MD Viewer</span>
         </a>
+        <div class="tab-strip">
+          <div class="tab-list" id="document-tabs" role="tablist" aria-label="Open files"></div>
+        </div>
         <div class="toolbar" aria-label="Document actions">
           <button class="button button-primary" id="open-button" type="button">Open file</button>
           <button class="button button-quiet" id="paste-button" type="button">Paste</button>
@@ -77,9 +80,6 @@ app.innerHTML = `
           <button class="icon-button" id="theme-button" type="button" aria-label="Switch color theme" title="Switch color theme">◐</button>
         </div>
         <input id="file-input" type="file" multiple accept=".md,.markdown,.mdown,.mkd,.txt,.text,.log,.out,.err,.csv,.tsv,.json,.jsonl,.ndjson,.yaml,.yml,.toml,.ini,.conf,.cfg,.properties,.xml,.html,.htm,.css,.scss,.less,.js,.mjs,.cjs,.ts,.tsx,.jsx,.py,.rb,.go,.rs,.java,.kt,.c,.h,.cpp,.hpp,.cs,.php,.swift,.sh,.bash,.zsh,.fish,.ps1,.bat,.cmd,.sql,.tex,.r,.diff,.patch,text/*,application/json,application/xml,application/x-yaml" hidden />
-      </div>
-      <div class="tab-strip">
-        <div class="tab-list" id="document-tabs" role="tablist" aria-label="Open files"></div>
       </div>
     </header>
 
