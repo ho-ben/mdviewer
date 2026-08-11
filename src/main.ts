@@ -67,7 +67,7 @@ app.innerHTML = `
     <header class="app-header">
       <div class="topbar">
         <a class="brand" href="./" aria-label="MD Viewer home">
-          <img class="brand-icon" src="./icon-192.png" alt="" width="38" height="38" />
+          <img class="brand-icon" src="./icon-mark-192.png" alt="" width="38" height="38" />
           <span>MD Viewer</span>
         </a>
         <div class="toolbar" aria-label="Document actions">

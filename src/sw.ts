@@ -5,6 +5,9 @@ import { NavigationRoute, registerRoute } from "workbox-routing";
 
 declare let self: ServiceWorkerGlobalScope;
 
+self.skipWaiting();
+self.addEventListener("activate", (event) => event.waitUntil(self.clients.claim()));
+
 precacheAndRoute((self as ServiceWorkerGlobalScope & {
   __WB_MANIFEST: Array<{ revision: string | null; url: string }>;
 }).__WB_MANIFEST);

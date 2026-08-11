@@ -8,6 +8,12 @@ describe("Markdown rendering", () => {
     expect(html).toContain('type="checkbox"');
   });
 
+  it("keeps strikethrough scoped inside task-list labels", () => {
+    const html = renderMarkdown("- [x] CommonMark, autolinks, and ~~strikethrough~~");
+    expect(html).toContain("<s>strikethrough</s></label>");
+    expect(html).not.toContain("~~strikethrough~~");
+  });
+
   it("renders dollar and LaTeX bracket math delimiters", () => {
     const html = renderMarkdown("$$x^2$$\n\n\\[y^2\\]\n\nInline \\(z\\).");
     expect(html.match(/class="katex/g)?.length).toBeGreaterThanOrEqual(3);

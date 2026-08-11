@@ -52,7 +52,7 @@ const parser = new MarkdownIt({
       .replace(/\s+/g, "-")
       .replace(/-+/g, "-")
   })
-  .use(taskLists, { enabled: false, label: true, labelAfter: true })
+  .use(taskLists, { enabled: false, label: true, labelAfter: false })
   .use(footnote)
   .use(deflist)
   .use(abbr)
