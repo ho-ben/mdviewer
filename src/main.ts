@@ -4,6 +4,7 @@ import "./styles.css";
 import { registerSW } from "virtual:pwa-register";
 import { renderMarkdown, renderPlainText } from "./markdown";
 import sampleMarkdown from "./sample.md?raw";
+import { loadStoredSession, saveStoredSession, type StoredSession } from "./storage";
 
 type BeforeInstallPromptEvent = Event & {
   prompt: () => Promise<void>;
@@ -152,6 +153,8 @@ let dragOffset = 0;
 let nextDocumentId = 0;
 let openDocuments: OpenDocument[] = [];
 let activeDocumentId = "";
+let persistenceQueue = Promise.resolve();
+let persistenceWarningShown = false;
 
 function showToast(message: string) {
   window.clearTimeout(toastTimer);
@@ -186,6 +189,59 @@ function activeDocument(): OpenDocument | undefined {
 function rememberActiveScroll() {
   const document = activeDocument();
   if (document) document.scrollY = window.scrollY;
+}
+
+function sessionSnapshot(): StoredSession {
+  return {
+    documents: openDocuments.map((document) => ({ ...document })),
+    activeDocumentId,
+    nextDocumentId
+  };
+}
+
+function preserveSession() {
+  const snapshot = sessionSnapshot();
+  persistenceQueue = persistenceQueue
+    .catch(() => undefined)
+    .then(() => saveStoredSession(snapshot))
+    .catch(() => {
+      if (!persistenceWarningShown) {
+        persistenceWarningShown = true;
+        showToast("Tabs will stay open for now, but this browser could not preserve them after a restart.");
+      }
+    });
+}
+
+function validStoredDocument(value: unknown): value is OpenDocument {
+  if (!value || typeof value !== "object") return false;
+  const document = value as Partial<OpenDocument>;
+  return typeof document.id === "string"
+    && typeof document.source === "string"
+    && typeof document.name === "string"
+    && typeof document.kind === "string"
+    && typeof document.scrollY === "number"
+    && Number.isFinite(document.scrollY);
+}
+
+async function restoreSession(): Promise<boolean> {
+  try {
+    const stored = await loadStoredSession();
+    const documents = stored?.documents.filter(validStoredDocument).slice(0, 100) ?? [];
+    if (!documents.length) return false;
+
+    openDocuments = documents;
+    nextDocumentId = Number.isSafeInteger(stored?.nextDocumentId)
+      ? Math.max(0, stored?.nextDocumentId ?? 0)
+      : documents.length;
+    activeDocumentId = documents.some((document) => document.id === stored?.activeDocumentId)
+      ? stored?.activeDocumentId ?? documents[documents.length - 1].id
+      : documents[documents.length - 1].id;
+    renderTabs();
+    await render(activeDocument() ?? documents[documents.length - 1]);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function renderTabs(focusId?: string) {
@@ -291,6 +347,7 @@ async function addDocument(source: string, name: string, kind = "Local document"
   openDocuments.push(openDocument);
   activeDocumentId = openDocument.id;
   renderTabs();
+  preserveSession();
   await render(openDocument);
 }
 
@@ -301,6 +358,7 @@ async function activateDocument(id: string) {
   if (!openDocument) return;
   activeDocumentId = id;
   renderTabs();
+  preserveSession();
   await render(openDocument);
 }
 
@@ -320,9 +378,11 @@ async function closeDocument(id: string) {
     const next = openDocuments[Math.min(closingIndex, openDocuments.length - 1)];
     activeDocumentId = next.id;
     renderTabs(next.id);
+    preserveSession();
     await render(next);
   } else {
     renderTabs();
+    preserveSession();
   }
 }
 
@@ -451,6 +511,16 @@ documentTabs.addEventListener("keydown", (event) => {
 
 window.addEventListener("scroll", requestScrollUpdate, { passive: true });
 window.addEventListener("resize", requestScrollUpdate, { passive: true });
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "hidden") {
+    rememberActiveScroll();
+    preserveSession();
+  }
+});
+window.addEventListener("pagehide", () => {
+  rememberActiveScroll();
+  preserveSession();
+});
 if ("ResizeObserver" in window) new ResizeObserver(requestScrollUpdate).observe(output);
 
 async function consumeSharedContent() {
@@ -550,5 +620,5 @@ registerSW({
   }
 });
 
-await addDocument(sampleMarkdown, "Welcome.md", "Demo document");
+if (!await restoreSession()) await addDocument(sampleMarkdown, "Welcome.md", "Demo document");
 await consumeSharedContent();

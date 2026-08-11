@@ -11,6 +11,7 @@ An installable, offline-first Markdown viewer built for Android and the web. Fil
 - Markdown plus logs, plain text, CSV/TSV, JSON, YAML, XML, configuration files, source code, and other common text formats
 - Local file picker, drag and drop, clipboard paste, Android Web Share Target, and experimental PWA file associations
 - Multiple closable file tabs, including multi-file picker, drop, and launch support, with per-tab scroll positions
+- Device-local tab restoration so Android sharing adds a tab without discarding files already open
 - Direction-aware app header and an accessible full-height scroll grabber for long files
 - Installable and fully usable offline after the first visit
 - Responsive light/dark reading interface and print styles
@@ -39,4 +40,4 @@ The manifest also declares `.md` file associations. Direct “Open with” behav
 
 ## Privacy and safety
 
-Rendering happens locally. Shared content is kept only long enough for the installed app to receive it, then removed from its temporary browser cache. Raw HTML is sanitized, Mermaid runs in strict mode, and KaTeX trust is disabled.
+Rendering happens locally. Open tab contents are stored only in this app's browser storage so they can survive Android share-target navigation; closing a tab removes it from the saved session. Shared content is kept only long enough for the installed app to receive it, then removed from its temporary browser cache. Raw HTML is sanitized, Mermaid runs in strict mode, and KaTeX trust is disabled.
