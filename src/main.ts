@@ -2,7 +2,7 @@ import "katex/dist/katex.min.css";
 import "highlight.js/styles/github-dark-dimmed.css";
 import "./styles.css";
 import { registerSW } from "virtual:pwa-register";
-import { renderMarkdown } from "./markdown";
+import { renderMarkdown, renderPlainText } from "./markdown";
 import sampleMarkdown from "./sample.md?raw";
 
 type BeforeInstallPromptEvent = Event & {
@@ -13,6 +13,38 @@ type BeforeInstallPromptEvent = Event & {
 type FileSystemFileHandleLike = { getFile: () => Promise<File> };
 type LaunchParamsLike = { files?: FileSystemFileHandleLike[] };
 type LaunchQueueLike = { setConsumer: (consumer: (params: LaunchParamsLike) => void) => void };
+
+const markdownExtensions = new Set(["md", "markdown", "mdown", "mkd"]);
+const textExtensions = new Set([
+  ...markdownExtensions,
+  "txt", "text", "log", "out", "err", "csv", "tsv", "json", "jsonl", "ndjson",
+  "yaml", "yml", "toml", "ini", "conf", "cfg", "properties", "xml", "html", "htm",
+  "css", "scss", "sass", "less", "js", "mjs", "cjs", "ts", "tsx", "jsx", "py", "rb",
+  "go", "rs", "java", "kt", "kts", "c", "h", "cc", "cpp", "hpp", "cs", "php", "swift",
+  "sh", "bash", "zsh", "fish", "ps1", "bat", "cmd", "sql", "tex", "r", "diff", "patch",
+  "env", "gitignore", "dockerfile", "makefile"
+]);
+
+const languageByExtension: Record<string, string> = {
+  json: "json", jsonl: "json", ndjson: "json", yaml: "yaml", yml: "yaml", toml: "ini",
+  ini: "ini", conf: "ini", cfg: "ini", properties: "properties", xml: "xml", html: "html",
+  htm: "html", css: "css", scss: "scss", less: "less", js: "javascript", mjs: "javascript",
+  cjs: "javascript", ts: "typescript", tsx: "typescript", jsx: "javascript", py: "python",
+  rb: "ruby", go: "go", rs: "rust", java: "java", kt: "kotlin", kts: "kotlin", c: "c",
+  h: "c", cc: "cpp", cpp: "cpp", hpp: "cpp", cs: "csharp", php: "php", swift: "swift",
+  sh: "bash", bash: "bash", zsh: "bash", fish: "shell", ps1: "powershell", bat: "dos",
+  cmd: "dos", sql: "sql", tex: "latex", r: "r", diff: "diff", patch: "diff"
+};
+
+function fileExtension(name: string): string {
+  const normalized = name.toLowerCase();
+  if (normalized === "dockerfile" || normalized === "makefile") return normalized;
+  return normalized.includes(".") ? normalized.split(".").pop() ?? "" : normalized;
+}
+
+function isMarkdownName(name: string): boolean {
+  return markdownExtensions.has(fileExtension(name));
+}
 
 declare global {
   interface Window {
@@ -27,7 +59,7 @@ app.innerHTML = `
   <div class="app-shell">
     <header class="topbar">
       <a class="brand" href="./" aria-label="MD Viewer home">
-        <span class="brand-mark">M↓</span>
+        <img class="brand-icon" src="./icon-192.png" alt="" width="38" height="38" />
         <span>MD Viewer</span>
       </a>
       <div class="toolbar" aria-label="Document actions">
@@ -36,12 +68,12 @@ app.innerHTML = `
         <button class="button button-quiet install-button" id="install-button" type="button" hidden>Install</button>
         <button class="icon-button" id="theme-button" type="button" aria-label="Switch color theme" title="Switch color theme">◐</button>
       </div>
-      <input id="file-input" type="file" accept=".md,.markdown,.mdown,.mkd,.txt,text/markdown,text/plain" hidden />
+      <input id="file-input" type="file" accept=".md,.markdown,.mdown,.mkd,.txt,.text,.log,.out,.err,.csv,.tsv,.json,.jsonl,.ndjson,.yaml,.yml,.toml,.ini,.conf,.cfg,.properties,.xml,.html,.htm,.css,.scss,.less,.js,.mjs,.cjs,.ts,.tsx,.jsx,.py,.rb,.go,.rs,.java,.kt,.c,.h,.cpp,.hpp,.cs,.php,.swift,.sh,.bash,.zsh,.fish,.ps1,.bat,.cmd,.sql,.tex,.r,.diff,.patch,text/*,application/json,application/xml,application/x-yaml" hidden />
     </header>
 
     <div class="privacy-strip">
       <span class="status-dot" aria-hidden="true"></span>
-      <span>Private by default — files are rendered locally and never uploaded.</span>
+      <span>Private by default — text files are rendered locally and never uploaded.</span>
     </div>
 
     <main class="workspace">
@@ -50,7 +82,7 @@ app.innerHTML = `
         <nav id="toc"></nav>
         <div class="support-card">
           <p>Works offline</p>
-          <span>Install once, then open or share Markdown without a connection.</span>
+          <span>Install once, then open or share Markdown, logs, and text files without a connection.</span>
         </div>
       </aside>
 
@@ -66,13 +98,16 @@ app.innerHTML = `
         <div class="drop-zone" id="drop-zone">
           <article class="markdown-body" id="markdown-output"></article>
           <div class="drop-overlay" aria-hidden="true">
-            <span>Drop Markdown to open</span>
+            <span>Drop a text file to open</span>
           </div>
         </div>
       </section>
     </main>
 
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
+    <div class="scroll-rail" id="scroll-rail" role="scrollbar" aria-label="Scroll through file" aria-controls="markdown-output" aria-orientation="vertical" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" tabindex="0">
+      <div class="scroll-thumb" id="scroll-thumb" aria-hidden="true"><i></i><i></i><i></i></div>
+    </div>
   </div>
 `;
 
@@ -88,10 +123,19 @@ const installButton = document.querySelector<HTMLButtonElement>("#install-button
 const themeButton = document.querySelector<HTMLButtonElement>("#theme-button")!;
 const dropZone = document.querySelector<HTMLElement>("#drop-zone")!;
 const toast = document.querySelector<HTMLElement>("#toast")!;
+const topbar = document.querySelector<HTMLElement>(".topbar")!;
+const scrollRail = document.querySelector<HTMLElement>("#scroll-rail")!;
+const scrollThumb = document.querySelector<HTMLElement>("#scroll-thumb")!;
 
 let installPrompt: BeforeInstallPromptEvent | null = null;
 let toastTimer = 0;
 let mermaidInitialized = false;
+let lastScrollY = window.scrollY;
+let scrollDirection = 0;
+let directionStartedAt = window.scrollY;
+let scrollFrame = 0;
+let draggedPointer: number | null = null;
+let dragOffset = 0;
 
 function showToast(message: string) {
   window.clearTimeout(toastTimer);
@@ -120,15 +164,23 @@ function updateToc() {
 }
 
 async function render(source: string, name: string, kind = "Local document") {
-  output.innerHTML = renderMarkdown(source);
+  const markdown = isMarkdownName(name);
+  output.innerHTML = markdown
+    ? renderMarkdown(source)
+    : renderPlainText(source, languageByExtension[fileExtension(name)] ?? "plaintext");
+  output.classList.toggle("plain-document", !markdown);
   fileName.textContent = name;
   documentKind.textContent = kind;
   const wordCount = source.trim() ? source.trim().split(/\s+/).length : 0;
-  documentMeta.textContent = `${wordCount.toLocaleString()} words · ${Math.max(1, Math.ceil(wordCount / 220))} min read`;
+  const lineCount = source ? source.split(/\r?\n/).length : 0;
+  documentMeta.textContent = markdown
+    ? `${wordCount.toLocaleString()} words · ${Math.max(1, Math.ceil(wordCount / 220))} min read`
+    : `${lineCount.toLocaleString()} lines · ${wordCount.toLocaleString()} words`;
   updateToc();
-  window.scrollTo({ top: 0, behavior: "smooth" });
+  window.scrollTo({ top: 0, behavior: "auto" });
+  requestAnimationFrame(updateScrollInterface);
 
-  const diagrams = [...output.querySelectorAll<HTMLElement>(".mermaid")];
+  const diagrams = markdown ? [...output.querySelectorAll<HTMLElement>(".mermaid")] : [];
   if (diagrams.length) {
     try {
       const { default: mermaid } = await import("mermaid");
@@ -142,6 +194,7 @@ async function render(source: string, name: string, kind = "Local document") {
         mermaidInitialized = true;
       }
       await mermaid.run({ nodes: diagrams, suppressErrors: true });
+      requestScrollUpdate();
     } catch {
       showToast("One diagram could not be rendered; the rest of the document is ready.");
     }
@@ -149,21 +202,108 @@ async function render(source: string, name: string, kind = "Local document") {
 }
 
 async function openFile(file: File) {
-  const validExtension = /\.(md|markdown|mdown|mkd|txt)$/i.test(file.name);
-  const validType = file.type === "" || file.type.startsWith("text/");
+  const extension = fileExtension(file.name);
+  const validExtension = textExtensions.has(extension);
+  const validType = file.type.startsWith("text/")
+    || ["application/json", "application/xml", "application/x-yaml", "application/toml"].includes(file.type);
   if (!validExtension && !validType) {
-    showToast("That doesn't look like a Markdown or text file.");
+    showToast("That doesn't look like a supported text file.");
     return;
   }
 
-  if (file.size > 10 * 1024 * 1024) {
-    showToast("Please choose a Markdown file smaller than 10 MB.");
+  if (file.size > 20 * 1024 * 1024) {
+    showToast("Please choose a text file smaller than 20 MB.");
     return;
   }
 
-  await render(await file.text(), file.name);
+  await render(await file.text(), file.name, isMarkdownName(file.name) ? "Local Markdown" : "Local text file");
   showToast(`${file.name} opened locally`);
 }
+
+function scrollMetrics() {
+  const maximum = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
+  const travel = Math.max(0, scrollRail.clientHeight - scrollThumb.offsetHeight);
+  return { maximum, travel };
+}
+
+function updateScrollInterface() {
+  scrollFrame = 0;
+  const current = window.scrollY;
+  const direction = current === lastScrollY ? scrollDirection : current > lastScrollY ? 1 : -1;
+
+  if (direction !== scrollDirection) {
+    scrollDirection = direction;
+    directionStartedAt = current;
+  }
+
+  if (current < 72 || topbar.contains(document.activeElement)) {
+    topbar.classList.remove("is-hidden");
+  } else if (Math.abs(current - directionStartedAt) > 14) {
+    topbar.classList.toggle("is-hidden", direction > 0);
+  }
+  lastScrollY = current;
+
+  const { maximum, travel } = scrollMetrics();
+  const progress = maximum ? Math.min(1, Math.max(0, current / maximum)) : 0;
+  scrollThumb.style.top = `${progress * travel}px`;
+  scrollRail.setAttribute("aria-valuenow", String(Math.round(progress * 100)));
+  scrollRail.classList.toggle("is-disabled", maximum < 2);
+}
+
+function requestScrollUpdate() {
+  if (!scrollFrame) scrollFrame = requestAnimationFrame(updateScrollInterface);
+}
+
+function scrollFromGrabber(clientY: number, behavior: ScrollBehavior = "auto") {
+  const railRect = scrollRail.getBoundingClientRect();
+  const { maximum, travel } = scrollMetrics();
+  const thumbTop = Math.min(travel, Math.max(0, clientY - railRect.top - dragOffset));
+  window.scrollTo({ top: travel ? (thumbTop / travel) * maximum : 0, behavior });
+}
+
+scrollRail.addEventListener("pointerdown", (event) => {
+  event.preventDefault();
+  draggedPointer = event.pointerId;
+  const thumbRect = scrollThumb.getBoundingClientRect();
+  dragOffset = scrollThumb.contains(event.target as Node)
+    ? event.clientY - thumbRect.top
+    : thumbRect.height / 2;
+  scrollRail.setPointerCapture(event.pointerId);
+  scrollRail.classList.add("is-dragging");
+  scrollFromGrabber(event.clientY);
+});
+
+scrollRail.addEventListener("pointermove", (event) => {
+  if (event.pointerId === draggedPointer) scrollFromGrabber(event.clientY);
+});
+
+function finishGrab(event: PointerEvent) {
+  if (event.pointerId !== draggedPointer) return;
+  draggedPointer = null;
+  scrollRail.classList.remove("is-dragging");
+  if (scrollRail.hasPointerCapture(event.pointerId)) scrollRail.releasePointerCapture(event.pointerId);
+}
+
+scrollRail.addEventListener("pointerup", finishGrab);
+scrollRail.addEventListener("pointercancel", finishGrab);
+scrollRail.addEventListener("keydown", (event) => {
+  const { maximum } = scrollMetrics();
+  const movements: Record<string, number> = {
+    ArrowUp: -80,
+    ArrowDown: 80,
+    PageUp: -window.innerHeight * 0.8,
+    PageDown: window.innerHeight * 0.8,
+    Home: -maximum,
+    End: maximum
+  };
+  if (!(event.key in movements)) return;
+  event.preventDefault();
+  window.scrollBy({ top: movements[event.key], behavior: "smooth" });
+});
+
+window.addEventListener("scroll", requestScrollUpdate, { passive: true });
+window.addEventListener("resize", requestScrollUpdate, { passive: true });
+if ("ResizeObserver" in window) new ResizeObserver(requestScrollUpdate).observe(output);
 
 async function consumeSharedContent() {
   if (!new URL(location.href).searchParams.has("shared")) return;

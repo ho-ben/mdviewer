@@ -8,7 +8,9 @@ An installable, offline-first Markdown viewer built for Android and the web. Fil
 - KaTeX equations using `$...$`, `$$...$$`, `\\(...\\)`, and `\\[...\\]`
 - Footnotes, definition lists, abbreviations, superscript, subscript, highlights, insertions, emoji shortcodes, and sanitized inline HTML
 - Mermaid diagrams and syntax-highlighted code blocks
+- Markdown plus logs, plain text, CSV/TSV, JSON, YAML, XML, configuration files, source code, and other common text formats
 - Local file picker, drag and drop, clipboard paste, Android Web Share Target, and experimental PWA file associations
+- Direction-aware compact header and an accessible full-height scroll grabber for long files
 - Installable and fully usable offline after the first visit
 - Responsive light/dark reading interface and print styles
 
@@ -30,7 +32,7 @@ npm run build
 
 1. Open the GitHub Pages site in Chrome on Android.
 2. Tap **Install** in the app, or use Chrome's **Install app** menu item.
-3. In Files, Drive, a notes app, or another app, share a `.md` file and choose **MD Viewer**.
+3. In Files, Drive, a notes app, or another app, share a Markdown, log, or text file and choose **MD Viewer**.
 
 The manifest also declares `.md` file associations. Direct “Open with” behavior depends on browser and Android support; sharing to the installed app is the dependable Android path. The File Handling API is also wired up for Chromium platforms that expose it.
 

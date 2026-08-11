@@ -1,8 +1,12 @@
 from pathlib import Path
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFont
 
 
 ROOT = Path(__file__).resolve().parents[1]
+FONT_CANDIDATES = [
+    Path("/System/Library/Fonts/Supplemental/Arial Bold.ttf"),
+    Path("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"),
+]
 
 
 def draw_icon(size: int, maskable: bool = False) -> Image.Image:
@@ -13,17 +17,21 @@ def draw_icon(size: int, maskable: bool = False) -> Image.Image:
     def box(values):
         return tuple(round(value * scale) for value in values)
 
-    outer = (78, 54, 434, 458) if maskable else (58, 38, 454, 474)
-    draw.rounded_rectangle(box(outer), radius=round(78 * scale), fill="#171916")
-    draw.rounded_rectangle(box((118, 90, 394, 422)), radius=round(28 * scale), fill="#fffefa")
+    # Everything stays within Android's circular safe area.
+    font_path = next((path for path in FONT_CANDIDATES if path.exists()), None)
+    font = ImageFont.truetype(str(font_path), round(180 * scale)) if font_path else ImageFont.load_default(size=round(180 * scale))
+    draw.text(box((72, 165)), "M", font=font, fill="#171916", stroke_width=0)
 
-    draw.rounded_rectangle(box((153, 127, 291, 141)), radius=round(7 * scale), fill="#b9b4a8")
-    draw.rounded_rectangle(box((153, 163, 339, 177)), radius=round(7 * scale), fill="#dcd8cd")
+    # A light document outline with a folded corner.
+    width = max(3, round(11 * scale))
+    page = [box((285, 134)), box((368, 134)), box((418, 184)), box((418, 374)), box((285, 374)), box((285, 134))]
+    draw.line(page, fill="#171916", width=width, joint="curve")
+    draw.line([box((368, 134)), box((368, 184)), box((418, 184))], fill="#171916", width=width, joint="curve")
 
-    draw.rounded_rectangle(box((235, 206, 277, 324)), radius=round(19 * scale), fill="#3057d5")
-    draw.polygon([box((192, 292, 192, 292))[:2], box((320, 292, 320, 292))[:2], box((256, 360, 256, 360))[:2]], fill="#3057d5")
-
-    draw.rounded_rectangle(box((153, 374, 337, 388)), radius=round(7 * scale), fill="#dcd8cd")
+    # Cobalt download arrow, sized for recognition at launcher scale.
+    arrow_width = max(3, round(17 * scale))
+    draw.line([box((351, 215)), box((351, 307))], fill="#3057d5", width=arrow_width)
+    draw.line([box((319, 279)), box((351, 313)), box((383, 279))], fill="#3057d5", width=arrow_width, joint="curve")
     return image
 
 

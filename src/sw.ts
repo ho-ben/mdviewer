@@ -15,7 +15,7 @@ registerRoute(new NavigationRoute(navigationHandler, { denylist: [/share-target$
 
 async function handleShare(request: Request): Promise<Response> {
   const data = await request.formData();
-  const sharedFile = data.get("markdown");
+  const sharedFile = data.get("textFile") ?? data.get("markdown");
   const title = String(data.get("title") ?? "").trim();
   const text = String(data.get("text") ?? "").trim();
   const url = String(data.get("url") ?? "").trim();
@@ -24,7 +24,7 @@ async function handleShare(request: Request): Promise<Response> {
   let name = title ? `${title.replace(/[^\p{L}\p{N} _.-]/gu, "").slice(0, 80) || "Shared"}.md` : "Shared.md";
 
   if (sharedFile instanceof File && sharedFile.size) {
-    if (sharedFile.size > 10 * 1024 * 1024) {
+    if (sharedFile.size > 20 * 1024 * 1024) {
       return Response.redirect(new URL("?share-error=size", self.registration.scope), 303);
     }
     source = await sharedFile.text();
@@ -35,7 +35,7 @@ async function handleShare(request: Request): Promise<Response> {
   const storageUrl = new URL("__shared-markdown", self.registration.scope).href;
   await cache.put(storageUrl, new Response(source, {
     headers: {
-      "Content-Type": "text/markdown; charset=utf-8",
+      "Content-Type": "text/plain; charset=utf-8",
       "X-File-Name": encodeURIComponent(name)
     }
   }));

@@ -98,3 +98,16 @@ export function renderMarkdown(source: string): string {
     FORBID_ATTR: ["onerror", "onload"]
   });
 }
+
+export function renderPlainText(source: string, language = "plaintext"): string {
+  let content = escapeHtml(source);
+  if (language !== "plaintext" && hljs.getLanguage(language)) {
+    try {
+      content = hljs.highlight(source, { language, ignoreIllegals: true }).value;
+    } catch {
+      // Escaped plain text is the safe fallback.
+    }
+  }
+
+  return `<pre class="plain-text-viewer hljs"><code>${content}</code></pre>`;
+}

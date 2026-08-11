@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { renderMarkdown } from "../src/markdown";
+import { renderMarkdown, renderPlainText } from "../src/markdown";
 
 describe("Markdown rendering", () => {
   it("renders GFM tables and task lists", () => {
@@ -32,5 +32,13 @@ describe("Markdown rendering", () => {
     const html = renderMarkdown("```mermaid\nflowchart LR\nA-->B\n```");
     expect(html).toContain('class="mermaid"');
     expect(html).toContain("A--&gt;B");
+  });
+
+  it("renders logs and text literally instead of treating them as Markdown", () => {
+    const html = renderPlainText("# not a heading\n<script>alert(1)</script>");
+    expect(html).toContain("# not a heading");
+    expect(html).toContain("&lt;script&gt;");
+    expect(html).not.toContain("<h1>");
+    expect(html).not.toContain("<script>");
   });
 });

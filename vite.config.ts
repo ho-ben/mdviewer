@@ -15,7 +15,7 @@ export default defineConfig({
         id: "./",
         name: "MD Viewer",
         short_name: "MD Viewer",
-        description: "Open Markdown files with tables, math, diagrams, and more — entirely on your device.",
+        description: "Open Markdown, logs, and common text files entirely on your device.",
         start_url: "./",
         scope: "./",
         display: "standalone",
@@ -38,8 +38,8 @@ export default defineConfig({
             url: "url",
             files: [
               {
-                name: "markdown",
-                accept: ["text/markdown", "text/plain", ".md", ".markdown", ".mdown", ".mkd", ".txt"]
+                name: "textFile",
+                accept: ["text/*", "application/json", "application/xml", "application/x-yaml", ".md", ".markdown", ".mdown", ".mkd", ".txt", ".text", ".log", ".out", ".err", ".csv", ".tsv", ".json", ".jsonl", ".yaml", ".yml", ".toml", ".ini", ".conf", ".cfg", ".xml"]
               }
             ]
           }
@@ -49,7 +49,10 @@ export default defineConfig({
             action: "./",
             accept: {
               "text/markdown": [".md", ".markdown", ".mdown", ".mkd"],
-              "text/plain": [".md", ".markdown", ".mdown", ".mkd", ".txt"]
+              "text/plain": [".txt", ".text", ".log", ".out", ".err", ".csv", ".tsv", ".toml", ".ini", ".conf", ".cfg", ".properties", ".html", ".css", ".js", ".ts", ".py", ".rb", ".go", ".rs", ".java", ".kt", ".c", ".h", ".cpp", ".hpp", ".sh", ".sql", ".tex", ".diff", ".patch"],
+              "application/json": [".json", ".jsonl", ".ndjson"],
+              "application/xml": [".xml"],
+              "application/x-yaml": [".yaml", ".yml"]
             }
           }
         ],
