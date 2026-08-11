@@ -13,6 +13,13 @@ type BeforeInstallPromptEvent = Event & {
 type FileSystemFileHandleLike = { getFile: () => Promise<File> };
 type LaunchParamsLike = { files?: FileSystemFileHandleLike[] };
 type LaunchQueueLike = { setConsumer: (consumer: (params: LaunchParamsLike) => void) => void };
+type OpenDocument = {
+  id: string;
+  source: string;
+  name: string;
+  kind: string;
+  scrollY: number;
+};
 
 const markdownExtensions = new Set(["md", "markdown", "mdown", "mkd"]);
 const textExtensions = new Set([
@@ -57,18 +64,23 @@ if (!app) throw new Error("App root is missing");
 
 app.innerHTML = `
   <div class="app-shell">
-    <header class="topbar">
-      <a class="brand" href="./" aria-label="MD Viewer home">
-        <img class="brand-icon" src="./icon-192.png" alt="" width="38" height="38" />
-        <span>MD Viewer</span>
-      </a>
-      <div class="toolbar" aria-label="Document actions">
-        <button class="button button-primary" id="open-button" type="button">Open file</button>
-        <button class="button button-quiet" id="paste-button" type="button">Paste</button>
-        <button class="button button-quiet install-button" id="install-button" type="button" hidden>Install</button>
-        <button class="icon-button" id="theme-button" type="button" aria-label="Switch color theme" title="Switch color theme">◐</button>
+    <header class="app-header">
+      <div class="topbar">
+        <a class="brand" href="./" aria-label="MD Viewer home">
+          <img class="brand-icon" src="./icon-192.png" alt="" width="38" height="38" />
+          <span>MD Viewer</span>
+        </a>
+        <div class="toolbar" aria-label="Document actions">
+          <button class="button button-primary" id="open-button" type="button">Open file</button>
+          <button class="button button-quiet" id="paste-button" type="button">Paste</button>
+          <button class="button button-quiet install-button" id="install-button" type="button" hidden>Install</button>
+          <button class="icon-button" id="theme-button" type="button" aria-label="Switch color theme" title="Switch color theme">◐</button>
+        </div>
+        <input id="file-input" type="file" multiple accept=".md,.markdown,.mdown,.mkd,.txt,.text,.log,.out,.err,.csv,.tsv,.json,.jsonl,.ndjson,.yaml,.yml,.toml,.ini,.conf,.cfg,.properties,.xml,.html,.htm,.css,.scss,.less,.js,.mjs,.cjs,.ts,.tsx,.jsx,.py,.rb,.go,.rs,.java,.kt,.c,.h,.cpp,.hpp,.cs,.php,.swift,.sh,.bash,.zsh,.fish,.ps1,.bat,.cmd,.sql,.tex,.r,.diff,.patch,text/*,application/json,application/xml,application/x-yaml" hidden />
       </div>
-      <input id="file-input" type="file" accept=".md,.markdown,.mdown,.mkd,.txt,.text,.log,.out,.err,.csv,.tsv,.json,.jsonl,.ndjson,.yaml,.yml,.toml,.ini,.conf,.cfg,.properties,.xml,.html,.htm,.css,.scss,.less,.js,.mjs,.cjs,.ts,.tsx,.jsx,.py,.rb,.go,.rs,.java,.kt,.c,.h,.cpp,.hpp,.cs,.php,.swift,.sh,.bash,.zsh,.fish,.ps1,.bat,.cmd,.sql,.tex,.r,.diff,.patch,text/*,application/json,application/xml,application/x-yaml" hidden />
+      <div class="tab-strip">
+        <div class="tab-list" id="document-tabs" role="tablist" aria-label="Open files"></div>
+      </div>
     </header>
 
     <div class="privacy-strip">
@@ -96,7 +108,7 @@ app.innerHTML = `
         </div>
 
         <div class="drop-zone" id="drop-zone">
-          <article class="markdown-body" id="markdown-output"></article>
+          <article class="markdown-body" id="markdown-output" role="tabpanel"></article>
           <div class="drop-overlay" aria-hidden="true">
             <span>Drop a text file to open</span>
           </div>
@@ -123,7 +135,8 @@ const installButton = document.querySelector<HTMLButtonElement>("#install-button
 const themeButton = document.querySelector<HTMLButtonElement>("#theme-button")!;
 const dropZone = document.querySelector<HTMLElement>("#drop-zone")!;
 const toast = document.querySelector<HTMLElement>("#toast")!;
-const topbar = document.querySelector<HTMLElement>(".topbar")!;
+const appHeader = document.querySelector<HTMLElement>(".app-header")!;
+const documentTabs = document.querySelector<HTMLElement>("#document-tabs")!;
 const scrollRail = document.querySelector<HTMLElement>("#scroll-rail")!;
 const scrollThumb = document.querySelector<HTMLElement>("#scroll-thumb")!;
 
@@ -136,6 +149,9 @@ let directionStartedAt = window.scrollY;
 let scrollFrame = 0;
 let draggedPointer: number | null = null;
 let dragOffset = 0;
+let nextDocumentId = 0;
+let openDocuments: OpenDocument[] = [];
+let activeDocumentId = "";
 
 function showToast(message: string) {
   window.clearTimeout(toastTimer);
@@ -163,7 +179,67 @@ function updateToc() {
   }
 }
 
-async function render(source: string, name: string, kind = "Local document") {
+function activeDocument(): OpenDocument | undefined {
+  return openDocuments.find((document) => document.id === activeDocumentId);
+}
+
+function rememberActiveScroll() {
+  const document = activeDocument();
+  if (document) document.scrollY = window.scrollY;
+}
+
+function renderTabs(focusId?: string) {
+  documentTabs.replaceChildren();
+
+  for (const openDocument of openDocuments) {
+    const item = window.document.createElement("div");
+    item.className = "tab-item";
+    item.dataset.active = String(openDocument.id === activeDocumentId);
+
+    const tab = window.document.createElement("button");
+    tab.className = "document-tab";
+    tab.type = "button";
+    tab.id = `tab-${openDocument.id}`;
+    tab.dataset.documentId = openDocument.id;
+    tab.setAttribute("role", "tab");
+    tab.setAttribute("aria-selected", String(openDocument.id === activeDocumentId));
+    tab.setAttribute("aria-controls", "markdown-output");
+    tab.tabIndex = openDocument.id === activeDocumentId ? 0 : -1;
+    tab.title = openDocument.name;
+
+    const label = window.document.createElement("span");
+    label.textContent = openDocument.name;
+    tab.append(label);
+    tab.addEventListener("click", () => void activateDocument(openDocument.id));
+
+    const close = window.document.createElement("button");
+    close.className = "tab-close";
+    close.type = "button";
+    close.dataset.closeDocumentId = openDocument.id;
+    close.setAttribute("aria-label", `Close ${openDocument.name}`);
+    close.title = `Close ${openDocument.name}`;
+    close.textContent = "×";
+    close.addEventListener("click", () => void closeDocument(openDocument.id));
+
+    item.append(tab, close);
+    documentTabs.append(item);
+  }
+
+  const selected = documentTabs.querySelector<HTMLElement>(`#tab-${CSS.escape(focusId ?? activeDocumentId)}`);
+  const tabStrip = documentTabs.parentElement;
+  if (selected && tabStrip) {
+    const left = selected.offsetLeft;
+    const right = left + selected.offsetWidth + 30;
+    if (left < tabStrip.scrollLeft) tabStrip.scrollTo({ left, behavior: "smooth" });
+    else if (right > tabStrip.scrollLeft + tabStrip.clientWidth) {
+      tabStrip.scrollTo({ left: right - tabStrip.clientWidth, behavior: "smooth" });
+    }
+  }
+  if (focusId) selected?.focus();
+}
+
+async function render(openDocument: OpenDocument) {
+  const { source, name, kind } = openDocument;
   const markdown = isMarkdownName(name);
   output.innerHTML = markdown
     ? renderMarkdown(source)
@@ -171,13 +247,15 @@ async function render(source: string, name: string, kind = "Local document") {
   output.classList.toggle("plain-document", !markdown);
   fileName.textContent = name;
   documentKind.textContent = kind;
+  window.document.title = `${name} · MD Viewer`;
+  output.setAttribute("aria-labelledby", `tab-${openDocument.id}`);
   const wordCount = source.trim() ? source.trim().split(/\s+/).length : 0;
   const lineCount = source ? source.split(/\r?\n/).length : 0;
   documentMeta.textContent = markdown
     ? `${wordCount.toLocaleString()} words · ${Math.max(1, Math.ceil(wordCount / 220))} min read`
     : `${lineCount.toLocaleString()} lines · ${wordCount.toLocaleString()} words`;
   updateToc();
-  window.scrollTo({ top: 0, behavior: "auto" });
+  window.scrollTo({ top: openDocument.scrollY, behavior: "auto" });
   requestAnimationFrame(updateScrollInterface);
 
   const diagrams = markdown ? [...output.querySelectorAll<HTMLElement>(".mermaid")] : [];
@@ -201,6 +279,53 @@ async function render(source: string, name: string, kind = "Local document") {
   }
 }
 
+async function addDocument(source: string, name: string, kind = "Local document") {
+  rememberActiveScroll();
+  const openDocument: OpenDocument = {
+    id: `document-${++nextDocumentId}`,
+    source,
+    name,
+    kind,
+    scrollY: 0
+  };
+  openDocuments.push(openDocument);
+  activeDocumentId = openDocument.id;
+  renderTabs();
+  await render(openDocument);
+}
+
+async function activateDocument(id: string) {
+  if (id === activeDocumentId) return;
+  rememberActiveScroll();
+  const openDocument = openDocuments.find((candidate) => candidate.id === id);
+  if (!openDocument) return;
+  activeDocumentId = id;
+  renderTabs();
+  await render(openDocument);
+}
+
+async function closeDocument(id: string) {
+  const closingIndex = openDocuments.findIndex((document) => document.id === id);
+  if (closingIndex < 0) return;
+  const wasActive = id === activeDocumentId;
+  openDocuments.splice(closingIndex, 1);
+
+  if (!openDocuments.length) {
+    activeDocumentId = "";
+    await addDocument(sampleMarkdown, "Welcome.md", "Demo document");
+    return;
+  }
+
+  if (wasActive) {
+    const next = openDocuments[Math.min(closingIndex, openDocuments.length - 1)];
+    activeDocumentId = next.id;
+    renderTabs(next.id);
+    await render(next);
+  } else {
+    renderTabs();
+  }
+}
+
 async function openFile(file: File) {
   const extension = fileExtension(file.name);
   const validExtension = textExtensions.has(extension);
@@ -216,7 +341,7 @@ async function openFile(file: File) {
     return;
   }
 
-  await render(await file.text(), file.name, isMarkdownName(file.name) ? "Local Markdown" : "Local text file");
+  await addDocument(await file.text(), file.name, isMarkdownName(file.name) ? "Local Markdown" : "Local text file");
   showToast(`${file.name} opened locally`);
 }
 
@@ -236,10 +361,11 @@ function updateScrollInterface() {
     directionStartedAt = current;
   }
 
-  if (current < 72 || topbar.contains(document.activeElement)) {
-    topbar.classList.remove("is-hidden");
+  const headerHasKeyboardFocus = Boolean(appHeader.querySelector(":focus-visible"));
+  if (current < 72 || headerHasKeyboardFocus) {
+    appHeader.classList.remove("is-hidden");
   } else if (Math.abs(current - directionStartedAt) > 14) {
-    topbar.classList.toggle("is-hidden", direction > 0);
+    appHeader.classList.toggle("is-hidden", direction > 0);
   }
   lastScrollY = current;
 
@@ -301,6 +427,28 @@ scrollRail.addEventListener("keydown", (event) => {
   window.scrollBy({ top: movements[event.key], behavior: "smooth" });
 });
 
+documentTabs.addEventListener("keydown", (event) => {
+  const tabs = [...documentTabs.querySelectorAll<HTMLButtonElement>("[role=tab]")];
+  const currentIndex = tabs.findIndex((tab) => tab === document.activeElement);
+  if (currentIndex < 0) return;
+
+  let targetIndex = currentIndex;
+  if (event.key === "ArrowLeft") targetIndex = (currentIndex - 1 + tabs.length) % tabs.length;
+  else if (event.key === "ArrowRight") targetIndex = (currentIndex + 1) % tabs.length;
+  else if (event.key === "Home") targetIndex = 0;
+  else if (event.key === "End") targetIndex = tabs.length - 1;
+  else if (event.key === "Delete") {
+    event.preventDefault();
+    const id = tabs[currentIndex].dataset.documentId;
+    if (id) void closeDocument(id);
+    return;
+  } else return;
+
+  event.preventDefault();
+  const id = tabs[targetIndex].dataset.documentId;
+  if (id) void activateDocument(id).then(() => renderTabs(id));
+});
+
 window.addEventListener("scroll", requestScrollUpdate, { passive: true });
 window.addEventListener("resize", requestScrollUpdate, { passive: true });
 if ("ResizeObserver" in window) new ResizeObserver(requestScrollUpdate).observe(output);
@@ -316,13 +464,13 @@ async function consumeSharedContent() {
   const name = decodeURIComponent(response.headers.get("X-File-Name") || "Shared.md");
   await cache.delete(storageUrl);
   history.replaceState({}, "", location.pathname);
-  await render(source, name, "Shared document");
-  showToast("Shared Markdown opened locally");
+  await addDocument(source, name, "Shared document");
+  showToast(`${name} opened locally`);
 }
 
 openButton.addEventListener("click", () => fileInput.click());
 fileInput.addEventListener("change", async () => {
-  if (fileInput.files?.[0]) await openFile(fileInput.files[0]);
+  for (const file of [...(fileInput.files ?? [])]) await openFile(file);
   fileInput.value = "";
 });
 
@@ -330,7 +478,7 @@ pasteButton.addEventListener("click", async () => {
   try {
     const text = await navigator.clipboard.readText();
     if (!text.trim()) throw new Error("Clipboard is empty");
-    await render(text, "Pasted.md", "Clipboard document");
+    await addDocument(text, "Pasted.md", "Clipboard document");
     showToast("Clipboard Markdown opened locally");
   } catch {
     showToast("Clipboard access was unavailable. Try opening a file instead.");
@@ -352,8 +500,7 @@ for (const eventName of ["dragleave", "drop"]) {
 }
 
 dropZone.addEventListener("drop", async (event) => {
-  const file = event.dataTransfer?.files[0];
-  if (file) await openFile(file);
+  for (const file of [...(event.dataTransfer?.files ?? [])]) await openFile(file);
 });
 
 themeButton.addEventListener("click", () => {
@@ -386,8 +533,7 @@ window.addEventListener("appinstalled", () => {
 
 if (window.launchQueue) {
   window.launchQueue.setConsumer(async (params) => {
-    const handle = params.files?.[0];
-    if (handle) await openFile(await handle.getFile());
+    for (const handle of params.files ?? []) await openFile(await handle.getFile());
   });
 }
 
@@ -404,5 +550,5 @@ registerSW({
   }
 });
 
-await render(sampleMarkdown, "Welcome.md", "Demo document");
+await addDocument(sampleMarkdown, "Welcome.md", "Demo document");
 await consumeSharedContent();

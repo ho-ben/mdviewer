@@ -10,7 +10,8 @@ An installable, offline-first Markdown viewer built for Android and the web. Fil
 - Mermaid diagrams and syntax-highlighted code blocks
 - Markdown plus logs, plain text, CSV/TSV, JSON, YAML, XML, configuration files, source code, and other common text formats
 - Local file picker, drag and drop, clipboard paste, Android Web Share Target, and experimental PWA file associations
-- Direction-aware compact header and an accessible full-height scroll grabber for long files
+- Multiple closable file tabs, including multi-file picker, drop, and launch support, with per-tab scroll positions
+- Direction-aware app header and an accessible full-height scroll grabber for long files
 - Installable and fully usable offline after the first visit
 - Responsive light/dark reading interface and print styles
 
