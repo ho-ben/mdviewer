@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { renderMarkdown, renderPlainText } from "../src/markdown";
+import { parseSharedFormData } from "../src/share";
 
 describe("Markdown rendering", () => {
   it("renders GFM tables and task lists", () => {
@@ -46,5 +47,23 @@ describe("Markdown rendering", () => {
     expect(html).toContain("&lt;script&gt;");
     expect(html).not.toContain("<h1>");
     expect(html).not.toContain("<script>");
+  });
+});
+
+describe("Android share parsing", () => {
+  it("reads a file from the current manifest field", async () => {
+    const data = new FormData();
+    data.set("textFile", new File(["# Shared"], "notes.md", { type: "text/markdown" }));
+    await expect(parseSharedFormData(data)).resolves.toEqual({ name: "notes.md", source: "# Shared" });
+  });
+
+  it("finds file-like attachments even when Android uses another field name", async () => {
+    const data = new FormData();
+    data.set("attachment", new File(["log line"], "report.log", { type: "text/plain" }));
+    await expect(parseSharedFormData(data)).resolves.toEqual({ name: "report.log", source: "log line" });
+  });
+
+  it("rejects shares without a file or text instead of opening a blank tab", async () => {
+    await expect(parseSharedFormData(new FormData())).rejects.toThrow("missing");
   });
 });

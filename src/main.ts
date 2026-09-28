@@ -524,11 +524,31 @@ window.addEventListener("pagehide", () => {
 if ("ResizeObserver" in window) new ResizeObserver(requestScrollUpdate).observe(output);
 
 async function consumeSharedContent() {
-  if (!new URL(location.href).searchParams.has("shared")) return;
+  const parameters = new URL(location.href).searchParams;
+  const shareError = parameters.get("share-error");
+  if (shareError) {
+    history.replaceState({}, "", location.pathname);
+    const messages: Record<string, string> = {
+      size: "That shared file is larger than the 20 MB limit.",
+      empty: "Android shared an empty file. Try sharing it from a different file app.",
+      missing: "Android did not include a readable file in that share."
+    };
+    showToast(messages[shareError] ?? "The shared file could not be opened.");
+    return;
+  }
+
+  const shareId = parameters.get("shared");
+  if (!shareId) return;
   const cache = await caches.open("mdviewer-shared-content");
-  const storageUrl = new URL("__shared-markdown", location.href).href;
+  const storageUrl = shareId === "1"
+    ? new URL("__shared-markdown", location.href).href
+    : new URL(`__shared-document/${encodeURIComponent(shareId)}`, location.href).href;
   const response = await cache.match(storageUrl);
-  if (!response) return;
+  if (!response) {
+    history.replaceState({}, "", location.pathname);
+    showToast("The shared file was no longer available. Please share it again.");
+    return;
+  }
 
   const source = await response.text();
   const name = decodeURIComponent(response.headers.get("X-File-Name") || "Shared.md");
