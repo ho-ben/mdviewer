@@ -137,6 +137,9 @@ button { color: inherit; }
   letter-spacing: 0.01em;
 }
 .status-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 4px color-mix(in srgb, var(--green) 13%, transparent); }
+.privacy-copy { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.privacy-link { flex: 0 0 auto; color: inherit; text-underline-offset: 2px; }
+.privacy-link:hover { color: var(--ink); }
 
 .workspace {
   width: min(1400px, 100%);
@@ -268,7 +271,7 @@ button { color: inherit; }
   .install-button { display: none !important; }
   .icon-button { width: 39px; min-height: 39px; }
   .tab-item { max-width: min(190px, 58vw); height: 34px; }
-  .privacy-strip { justify-content: flex-start; padding-inline: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .privacy-strip { justify-content: flex-start; padding-inline: 15px; overflow: hidden; }
   .workspace { padding: 26px 10px 60px; }
   .document-bar { padding-inline: 5px; align-items: start; flex-direction: column; gap: 8px; }
   .document-bar h1 { max-width: calc(100vw - 30px); }

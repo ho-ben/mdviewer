@@ -7,6 +7,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
+    "android:prepare": "pnpm run build && node scripts/prepare-android-assets.mjs",
     "preview": "vite preview",
     "test": "vitest run"
   },

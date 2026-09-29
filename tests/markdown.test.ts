@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { renderMarkdown, renderPlainText } from "../src/markdown";
 import { parseSharedFormData } from "../src/share";
+import { parseNativeDocumentReferences } from "../src/native";
 
 describe("Markdown rendering", () => {
   it("renders GFM tables and task lists", () => {
@@ -65,5 +66,20 @@ describe("Android share parsing", () => {
 
   it("rejects shares without a file or text instead of opening a blank tab", async () => {
     await expect(parseSharedFormData(new FormData())).rejects.toThrow("missing");
+  });
+});
+
+describe("Native Android document references", () => {
+  it("accepts safe native document metadata", () => {
+    expect(parseNativeDocumentReferences([
+      { id: "123e4567-e89b-12d3-a456-426614174000", name: "notes.md" }
+    ])).toEqual([{ id: "123e4567-e89b-12d3-a456-426614174000", name: "notes.md" }]);
+  });
+
+  it("rejects malformed native document metadata", () => {
+    expect(parseNativeDocumentReferences([
+      { id: "../../secret", name: "notes.md" },
+      { id: "123e4567-e89b-12d3-a456-426614174000", name: "" }
+    ])).toEqual([]);
   });
 });

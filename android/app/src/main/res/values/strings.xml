@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">MD Viewer</string>
+    <string name="file_too_large">%1$s is larger than the 20 MB limit.</string>
+    <string name="file_unreadable">%1$s could not be read.</string>
+    <string name="file_unsupported">%1$s does not look like a supported text file.</string>
+</resources>

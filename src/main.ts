@@ -5,6 +5,7 @@ import { registerSW } from "virtual:pwa-register";
 import { renderMarkdown, renderPlainText } from "./markdown";
 import sampleMarkdown from "./sample.md?raw";
 import { loadStoredSession, saveStoredSession, type StoredSession } from "./storage";
+import { parseNativeDocumentReferences } from "./native";
 
 type BeforeInstallPromptEvent = Event & {
   prompt: () => Promise<void>;
@@ -57,17 +58,20 @@ function isMarkdownName(name: string): boolean {
 declare global {
   interface Window {
     launchQueue?: LaunchQueueLike;
+    mdViewerOpenNativeDocuments?: (documents: unknown) => Promise<void>;
   }
 }
 
 const app = document.querySelector<HTMLDivElement>("#app");
 if (!app) throw new Error("App root is missing");
+const initialUrl = new URL(location.href);
+const isNativeApp = initialUrl.searchParams.has("native");
 
 app.innerHTML = `
   <div class="app-shell">
     <header class="app-header">
       <div class="topbar">
-        <a class="brand" href="./" aria-label="MD Viewer home">
+        <a class="brand" href="./${isNativeApp ? "?native=1" : ""}" aria-label="MD Viewer home">
           <img class="brand-icon" src="./icon-mark-192.png" alt="" width="38" height="38" />
           <span>MD Viewer</span>
         </a>
@@ -86,7 +90,8 @@ app.innerHTML = `
 
     <div class="privacy-strip">
       <span class="status-dot" aria-hidden="true"></span>
-      <span>Private by default — text files are rendered locally and never uploaded.</span>
+      <span class="privacy-copy">Private by default — text files are rendered locally and never uploaded.</span>
+      <a class="privacy-link" href="https://ho-ben.github.io/mdviewer/privacy.html">Privacy</a>
     </div>
 
     <main class="workspace">
@@ -350,6 +355,35 @@ async function addDocument(source: string, name: string, kind = "Local document"
   preserveSession();
   await render(openDocument);
 }
+
+function removeDemoDocumentBeforeNativeOpen() {
+  if (openDocuments.length !== 1) return;
+  const onlyDocument = openDocuments[0];
+  if (onlyDocument.kind !== "Demo document" || onlyDocument.name !== "Welcome.md") return;
+  openDocuments = [];
+  activeDocumentId = "";
+}
+
+window.mdViewerOpenNativeDocuments = async (value: unknown) => {
+  const documents = parseNativeDocumentReferences(value);
+  if (!documents.length) return;
+
+  removeDemoDocumentBeforeNativeOpen();
+  for (const document of documents) {
+    try {
+      const response = await fetch(`${location.origin}/native/${encodeURIComponent(document.id)}`, {
+        cache: "no-store"
+      });
+      if (!response.ok) throw new Error(`Native document request failed: ${response.status}`);
+      const source = await response.text();
+      const kind = isMarkdownName(document.name) ? "Android Markdown" : "Android text file";
+      await addDocument(source, document.name, kind);
+      showToast(`${document.name} opened locally`);
+    } catch {
+      showToast(`${document.name} could not be read. Please try opening it again.`);
+    }
+  }
+};
 
 async function activateDocument(id: string) {
   if (id === activeDocumentId) return;
@@ -632,13 +666,15 @@ if (storedTheme === "dark" || storedTheme === "light") {
   document.documentElement.dataset.theme = storedTheme;
 }
 
-registerSW({
-  immediate: true,
-  onOfflineReady: () => showToast("Ready to read Markdown offline"),
-  onNeedRefresh() {
-    showToast("An update is ready. Reopen the app to use it.");
-  }
-});
+if (!isNativeApp) {
+  registerSW({
+    immediate: true,
+    onOfflineReady: () => showToast("Ready to read Markdown offline"),
+    onNeedRefresh() {
+      showToast("An update is ready. Reopen the app to use it.");
+    }
+  });
+}
 
 if (!await restoreSession()) await addDocument(sampleMarkdown, "Welcome.md", "Demo document");
-await consumeSharedContent();
+if (!isNativeApp) await consumeSharedContent();
