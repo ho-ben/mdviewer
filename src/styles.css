@@ -35,11 +35,12 @@ body { margin: 0; min-width: 320px; background: var(--canvas); color: var(--ink)
 button, input { font: inherit; }
 button { color: inherit; }
 
-.app-shell { min-height: 100vh; }
+.app-shell { min-height: 100vh; min-height: 100dvh; }
 
 .app-header {
   position: sticky;
   top: 0;
+  padding-top: env(safe-area-inset-top);
   z-index: 20;
   border-bottom: 1px solid color-mix(in srgb, var(--line) 78%, transparent);
   background: color-mix(in srgb, var(--canvas) 90%, transparent);
@@ -224,7 +225,7 @@ button { color: inherit; }
 
 .scroll-rail {
   position: fixed;
-  top: 82px;
+  top: calc(82px + env(safe-area-inset-top));
   right: max(5px, env(safe-area-inset-right));
   bottom: max(20px, env(safe-area-inset-bottom));
   z-index: 19;
@@ -234,7 +235,7 @@ button { color: inherit; }
   touch-action: none;
   transition: top 220ms ease, opacity 160ms ease;
 }
-.app-header.is-hidden ~ .scroll-rail { top: 24px; }
+.app-header.is-hidden ~ .scroll-rail { top: calc(24px + env(safe-area-inset-top)); }
 .scroll-rail::before { content: ""; position: absolute; top: 0; bottom: 0; left: 50%; width: 3px; transform: translateX(-50%); border-radius: 999px; background: color-mix(in srgb, var(--line-strong) 48%, transparent); }
 .scroll-thumb { position: absolute; top: 0; left: 1px; width: 26px; height: 62px; display: grid; place-content: center; gap: 4px; border: 1px solid var(--line-strong); border-radius: 999px; background: color-mix(in srgb, var(--paper) 92%, transparent); box-shadow: 0 6px 22px rgba(23, 25, 22, 0.13); backdrop-filter: blur(10px); }
 .scroll-thumb i { display: block; width: 9px; height: 1px; border-radius: 2px; background: var(--muted); }

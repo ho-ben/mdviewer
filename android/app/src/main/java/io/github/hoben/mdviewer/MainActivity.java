@@ -11,6 +11,8 @@ import android.os.Build;
 import android.os.Bundle;
 import android.provider.OpenableColumns;
 import android.util.Base64;
+import android.view.ViewGroup;
+import android.view.WindowInsets;
 import android.webkit.MimeTypeMap;
 import android.webkit.RenderProcessGoneDetail;
 import android.webkit.ValueCallback;
@@ -20,6 +22,7 @@ import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import android.widget.FrameLayout;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
@@ -88,11 +91,40 @@ public final class MainActivity extends Activity {
                 .addPathHandler("/native/", this::serveNativeDocument)
                 .build();
 
+        FrameLayout appFrame = new FrameLayout(this);
+        appFrame.setBackgroundColor(getColor(R.color.app_background));
+
         webView = new WebView(this);
         configureWebView(assetLoader);
-        setContentView(webView);
+        appFrame.addView(webView, new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT
+        ));
+        applySystemBarInsets(appFrame);
+        setContentView(appFrame);
         webView.loadUrl(APP_URL);
         receiveIntent(getIntent());
+    }
+
+    private void applySystemBarInsets(FrameLayout appFrame) {
+        appFrame.setOnApplyWindowInsetsListener((view, windowInsets) -> {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                android.graphics.Insets insets = windowInsets.getInsets(
+                        WindowInsets.Type.systemBars() | WindowInsets.Type.displayCutout()
+                );
+                view.setPadding(insets.left, insets.top, insets.right, insets.bottom);
+                return WindowInsets.CONSUMED;
+            }
+
+            view.setPadding(
+                    windowInsets.getSystemWindowInsetLeft(),
+                    windowInsets.getSystemWindowInsetTop(),
+                    windowInsets.getSystemWindowInsetRight(),
+                    windowInsets.getSystemWindowInsetBottom()
+            );
+            return windowInsets.consumeSystemWindowInsets();
+        });
+        appFrame.requestApplyInsets();
     }
 
     @SuppressLint("SetJavaScriptEnabled")

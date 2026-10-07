@@ -9,7 +9,7 @@ FONT_CANDIDATES = [
 ]
 
 
-def draw_icon(size: int, maskable: bool = False) -> Image.Image:
+def draw_icon(size: int) -> Image.Image:
     scale = size / 512
     image = Image.new("RGB", (size, size), "#f6f3ec")
     draw = ImageDraw.Draw(image)
@@ -33,6 +33,21 @@ def draw_icon(size: int, maskable: bool = False) -> Image.Image:
     return image
 
 
+def draw_android_foreground(size: int) -> Image.Image:
+    # Adaptive icons reserve the outer part of the foreground layer for launcher
+    # motion and masks. Keep the complete mark inside the central safe zone.
+    image = Image.new("RGB", (size, size), "#f6f3ec")
+    artwork_size = round(size * 0.75)
+    artwork = draw_icon(artwork_size)
+    offset = (size - artwork_size) // 2
+    image.paste(artwork, (offset, offset))
+    return image
+
+
 draw_icon(192).save(ROOT / "public" / "icon-mark-192.png", optimize=True)
 draw_icon(512).save(ROOT / "public" / "icon-mark-512.png", optimize=True)
-draw_icon(512, maskable=True).save(ROOT / "public" / "icon-mark-maskable-512.png", optimize=True)
+draw_icon(512).save(ROOT / "public" / "icon-mark-maskable-512.png", optimize=True)
+draw_android_foreground(512).save(
+    ROOT / "android" / "app" / "src" / "main" / "res" / "drawable-nodpi" / "icon_mark_foreground.png",
+    optimize=True,
+)
