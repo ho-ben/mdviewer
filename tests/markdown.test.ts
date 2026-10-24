@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { renderMarkdown, renderPlainText } from "../src/markdown";
 import { parseSharedFormData } from "../src/share";
 import { parseNativeDocumentReferences } from "../src/native";
+import { replaceDocumentByName } from "../src/documents";
 
 describe("Markdown rendering", () => {
   it("renders GFM tables and task lists", () => {
@@ -81,5 +82,32 @@ describe("Native Android document references", () => {
       { id: "../../secret", name: "notes.md" },
       { id: "123e4567-e89b-12d3-a456-426614174000", name: "" }
     ])).toEqual([]);
+  });
+});
+
+describe("Reopening Android documents", () => {
+  it("replaces the newest matching tab with updated contents", () => {
+    const documents = [
+      { id: "document-1", name: "notes.md", source: "older", kind: "Android Markdown", scrollY: 320 },
+      { id: "document-2", name: "other.md", source: "other", kind: "Android Markdown", scrollY: 10 },
+      { id: "document-3", name: "notes.md", source: "old", kind: "Android Markdown", scrollY: 180 }
+    ];
+
+    const replaced = replaceDocumentByName(documents, "notes.md", "new", "Android Markdown");
+
+    expect(replaced?.id).toBe("document-3");
+    expect(replaced?.source).toBe("new");
+    expect(replaced?.scrollY).toBe(0);
+    expect(documents[0].source).toBe("older");
+    expect(documents).toHaveLength(3);
+  });
+
+  it("does not replace a differently named file", () => {
+    const documents = [
+      { id: "document-1", name: "notes.md", source: "old", kind: "Android Markdown", scrollY: 0 }
+    ];
+
+    expect(replaceDocumentByName(documents, "notes-2.md", "new", "Android Markdown")).toBeUndefined();
+    expect(documents[0].source).toBe("old");
   });
 });

@@ -6,6 +6,7 @@ import { renderMarkdown, renderPlainText } from "./markdown";
 import sampleMarkdown from "./sample.md?raw";
 import { loadStoredSession, saveStoredSession, type StoredSession } from "./storage";
 import { parseNativeDocumentReferences } from "./native";
+import { replaceDocumentByName } from "./documents";
 
 type BeforeInstallPromptEvent = Event & {
   prompt: () => Promise<void>;
@@ -340,8 +341,24 @@ async function render(openDocument: OpenDocument) {
   }
 }
 
-async function addDocument(source: string, name: string, kind = "Local document") {
+async function addDocument(
+  source: string,
+  name: string,
+  kind = "Local document",
+  replaceExistingName = false
+): Promise<"added" | "replaced"> {
   rememberActiveScroll();
+  if (replaceExistingName) {
+    const existing = replaceDocumentByName(openDocuments, name, source, kind);
+    if (existing) {
+      activeDocumentId = existing.id;
+      renderTabs();
+      preserveSession();
+      await render(existing);
+      return "replaced";
+    }
+  }
+
   const openDocument: OpenDocument = {
     id: `document-${++nextDocumentId}`,
     source,
@@ -354,6 +371,7 @@ async function addDocument(source: string, name: string, kind = "Local document"
   renderTabs();
   preserveSession();
   await render(openDocument);
+  return "added";
 }
 
 function removeDemoDocumentBeforeNativeOpen() {
@@ -377,8 +395,8 @@ window.mdViewerOpenNativeDocuments = async (value: unknown) => {
       if (!response.ok) throw new Error(`Native document request failed: ${response.status}`);
       const source = await response.text();
       const kind = isMarkdownName(document.name) ? "Android Markdown" : "Android text file";
-      await addDocument(source, document.name, kind);
-      showToast(`${document.name} opened locally`);
+      const result = await addDocument(source, document.name, kind, true);
+      showToast(`${document.name} ${result === "replaced" ? "refreshed" : "opened"} locally`);
     } catch {
       showToast(`${document.name} could not be read. Please try opening it again.`);
     }
