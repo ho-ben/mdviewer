@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { renderMarkdown, renderPlainText } from "../src/markdown";
 import { parseSharedFormData } from "../src/share";
 import { parseNativeDocumentReferences } from "../src/native";
-import { replaceDocumentByName } from "../src/documents";
+import { isCloseTabShortcut, replaceDocumentByName } from "../src/documents";
 import { createStartupGate } from "../src/startup";
 
 describe("Markdown rendering", () => {
@@ -111,8 +111,8 @@ describe("Native Android document references", () => {
   });
 });
 
-describe("Reopening Android documents", () => {
-  it("replaces the newest matching tab with updated contents", () => {
+describe("Reopening documents", () => {
+  it("replaces the newest matching tab and removes stale duplicates", () => {
     const documents = [
       { id: "document-1", name: "notes.md", source: "older", kind: "Android Markdown", scrollY: 320 },
       { id: "document-2", name: "other.md", source: "other", kind: "Android Markdown", scrollY: 10 },
@@ -124,8 +124,7 @@ describe("Reopening Android documents", () => {
     expect(replaced?.id).toBe("document-3");
     expect(replaced?.source).toBe("new");
     expect(replaced?.scrollY).toBe(0);
-    expect(documents[0].source).toBe("older");
-    expect(documents).toHaveLength(3);
+    expect(documents.map((document) => document.id)).toEqual(["document-2", "document-3"]);
   });
 
   it("does not replace a differently named file", () => {
@@ -135,5 +134,18 @@ describe("Reopening Android documents", () => {
 
     expect(replaceDocumentByName(documents, "notes-2.md", "new", "Android Markdown")).toBeUndefined();
     expect(documents[0].source).toBe("old");
+  });
+});
+
+describe("Tab keyboard shortcuts", () => {
+  it("uses Alt/Option plus the physical W key to close a tab", () => {
+    expect(isCloseTabShortcut({ altKey: true, code: "KeyW", ctrlKey: false, metaKey: false, repeat: false })).toBe(true);
+  });
+
+  it("does not intercept browser, command-key, or repeated variants", () => {
+    expect(isCloseTabShortcut({ altKey: false, code: "KeyW", ctrlKey: false, metaKey: true, repeat: false })).toBe(false);
+    expect(isCloseTabShortcut({ altKey: true, code: "KeyW", ctrlKey: true, metaKey: false, repeat: false })).toBe(false);
+    expect(isCloseTabShortcut({ altKey: true, code: "KeyQ", ctrlKey: false, metaKey: false, repeat: false })).toBe(false);
+    expect(isCloseTabShortcut({ altKey: true, code: "KeyW", ctrlKey: false, metaKey: false, repeat: true })).toBe(false);
   });
 });

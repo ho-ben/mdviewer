@@ -5,6 +5,12 @@ export type ReplaceableDocument = {
   scrollY: number;
 };
 
+export function isCloseTabShortcut(
+  event: Pick<KeyboardEvent, "altKey" | "code" | "ctrlKey" | "metaKey" | "repeat">
+): boolean {
+  return event.altKey && !event.ctrlKey && !event.metaKey && !event.repeat && event.code === "KeyW";
+}
+
 export function replaceDocumentByName<T extends ReplaceableDocument>(
   documents: T[],
   name: string,
@@ -12,13 +18,19 @@ export function replaceDocumentByName<T extends ReplaceableDocument>(
   kind: string
 ): T | undefined {
   let existing: T | undefined;
+  let existingIndex = -1;
   for (let index = documents.length - 1; index >= 0; index -= 1) {
     if (documents[index].name === name) {
       existing = documents[index];
+      existingIndex = index;
       break;
     }
   }
   if (!existing) return undefined;
+
+  for (let index = existingIndex - 1; index >= 0; index -= 1) {
+    if (documents[index].name === name) documents.splice(index, 1);
+  }
 
   existing.source = source;
   existing.kind = kind;

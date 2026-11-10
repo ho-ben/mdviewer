@@ -6,7 +6,7 @@ import { renderMarkdown, renderPlainText } from "./markdown";
 import sampleMarkdown from "./sample.md?raw";
 import { loadStoredSession, saveStoredSession, type StoredSession } from "./storage";
 import { parseNativeDocumentReferences } from "./native";
-import { replaceDocumentByName } from "./documents";
+import { isCloseTabShortcut, replaceDocumentByName } from "./documents";
 import { createStartupGate } from "./startup";
 
 type BeforeInstallPromptEvent = Event & {
@@ -458,8 +458,13 @@ async function openFile(file: File) {
     return;
   }
 
-  await addDocument(await file.text(), file.name, isMarkdownName(file.name) ? "Local Markdown" : "Local text file");
-  showToast(`${file.name} opened locally`);
+  const result = await addDocument(
+    await file.text(),
+    file.name,
+    isMarkdownName(file.name) ? "Local Markdown" : "Local text file",
+    true
+  );
+  showToast(`${file.name} ${result === "replaced" ? "refreshed" : "opened"} locally`);
 }
 
 function scrollMetrics() {
@@ -566,6 +571,12 @@ documentTabs.addEventListener("keydown", (event) => {
   if (id) void activateDocument(id).then(() => renderTabs(id));
 });
 
+window.addEventListener("keydown", (event) => {
+  if (!isCloseTabShortcut(event) || !activeDocumentId) return;
+  event.preventDefault();
+  void closeDocument(activeDocumentId);
+}, { capture: true });
+
 window.addEventListener("scroll", requestScrollUpdate, { passive: true });
 window.addEventListener("resize", requestScrollUpdate, { passive: true });
 document.addEventListener("visibilitychange", () => {
@@ -611,8 +622,8 @@ async function consumeSharedContent() {
   const name = decodeURIComponent(response.headers.get("X-File-Name") || "Shared.md");
   await cache.delete(storageUrl);
   history.replaceState({}, "", location.pathname);
-  await addDocument(source, name, "Shared document");
-  showToast(`${name} opened locally`);
+  const result = await addDocument(source, name, "Shared document", true);
+  showToast(`${name} ${result === "replaced" ? "refreshed" : "opened"} locally`);
 }
 
 openButton.addEventListener("click", () => fileInput.click());
