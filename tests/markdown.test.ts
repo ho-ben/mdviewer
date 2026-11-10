@@ -3,6 +3,7 @@ import { renderMarkdown, renderPlainText } from "../src/markdown";
 import { parseSharedFormData } from "../src/share";
 import { parseNativeDocumentReferences } from "../src/native";
 import { replaceDocumentByName } from "../src/documents";
+import { createStartupGate } from "../src/startup";
 
 describe("Markdown rendering", () => {
   it("renders GFM tables and task lists", () => {
@@ -43,12 +44,37 @@ describe("Markdown rendering", () => {
     expect(html).toContain("A--&gt;B");
   });
 
+  it("adds an accessible clipboard button to fenced code blocks", () => {
+    const html = renderMarkdown("```js\nconst answer = 42;\n```");
+    expect(html).toContain('class="copy-code-button"');
+    expect(html).toContain('aria-label="Copy code to clipboard"');
+    expect(html).toContain("answer =");
+  });
+
   it("renders logs and text literally instead of treating them as Markdown", () => {
     const html = renderPlainText("# not a heading\n<script>alert(1)</script>");
     expect(html).toContain("# not a heading");
     expect(html).toContain("&lt;script&gt;");
     expect(html).not.toContain("<h1>");
     expect(html).not.toContain("<script>");
+  });
+});
+
+describe("Cold-start document delivery", () => {
+  it("holds file-open work until session restoration is finished", async () => {
+    const gate = createStartupGate();
+    const events: string[] = [];
+    const opening = (async () => {
+      await gate.wait();
+      events.push("file opened");
+    })();
+
+    await Promise.resolve();
+    expect(events).toEqual([]);
+    events.push("session restored");
+    gate.open();
+    await opening;
+    expect(events).toEqual(["session restored", "file opened"]);
   });
 });
 

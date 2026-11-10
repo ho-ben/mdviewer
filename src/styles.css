@@ -209,6 +209,25 @@ button { color: inherit; }
 .markdown-body code { padding: 0.16em 0.38em; border-radius: 5px; background: color-mix(in srgb, var(--canvas) 78%, transparent); font: 0.86em/1.5 "SFMono-Regular", Consolas, "Liberation Mono", monospace; }
 .markdown-body pre { margin: 1.5em 0; padding: 18px 20px; overflow-x: auto; border: 1px solid #333b46; border-radius: 12px; background: #1f242c; color: #e6edf3; }
 .markdown-body pre code { padding: 0; background: transparent; font-size: 12px; }
+.markdown-body .code-block { position: relative; margin: 1.5em 0; }
+.markdown-body .code-block pre { margin: 0; padding-top: 48px; }
+.copy-code-button {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 1;
+  min-width: 62px;
+  min-height: 30px;
+  padding: 0 10px;
+  border: 1px solid #4c5665;
+  border-radius: 7px;
+  background: #2a313b;
+  color: #e6edf3;
+  font: 600 11px/1 Inter, ui-sans-serif, system-ui, sans-serif;
+  cursor: pointer;
+}
+.copy-code-button:hover { border-color: #7d8ba0; background: #343d49; }
+.copy-code-button:focus-visible { outline: 2px solid #8aa4ff; outline-offset: 2px; }
 .markdown-body.plain-document { padding: clamp(20px, 4vw, 42px); }
 .markdown-body .plain-text-viewer { min-height: 500px; margin: 0; border: 0; border-radius: 10px; white-space: pre; tab-size: 4; }
 .markdown-body .plain-text-viewer code { display: block; min-width: max-content; font-size: 12px; line-height: 1.65; }
@@ -284,9 +303,10 @@ button { color: inherit; }
 }
 
 @media print {
-  .app-header, .privacy-strip, .contents, .document-bar, .toast, .scroll-rail { display: none !important; }
+  .app-header, .privacy-strip, .contents, .document-bar, .toast, .scroll-rail, .copy-code-button { display: none !important; }
   .workspace { display: block; padding: 0; }
   .markdown-body { border: 0; box-shadow: none; padding: 0; }
+  .markdown-body .code-block pre { padding-top: 18px; }
 }
 
 @media (prefers-reduced-motion: reduce) {

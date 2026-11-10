@@ -7,14 +7,15 @@ An installable, offline-first Markdown viewer built for Android and the web. Fil
 - CommonMark and GitHub-flavored Markdown, including tables, task lists, strikethrough, autolinks, and fenced code
 - KaTeX equations using `$...$`, `$$...$$`, `\\(...\\)`, and `\\[...\\]`
 - Footnotes, definition lists, abbreviations, superscript, subscript, highlights, insertions, emoji shortcodes, and sanitized inline HTML
-- Mermaid diagrams and syntax-highlighted code blocks
+- Mermaid diagrams and syntax-highlighted code blocks with one-click clipboard copying
 - Markdown plus logs, plain text, CSV/TSV, JSON, YAML, XML, configuration files, source code, and other common text formats
 - Local file picker, drag and drop, clipboard paste, Android Web Share Target, and native Android Share/Open with support
 - Multiple closable file tabs, including multi-file picker, drop, and launch support, with per-tab scroll positions
 - Device-local tab restoration so Android sharing adds a tab without discarding files already open
 - Direction-aware app header and an accessible full-height scroll grabber for long files
 - Installable and fully usable offline after the first visit
-- Responsive light/dark reading interface and print styles
+- Responsive light/dark reading interface and PDF export through the system print dialog
+- Operating-system file association limited to Markdown extensions; other text formats remain available through the in-app picker
 
 ## Run locally
 

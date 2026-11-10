@@ -7,6 +7,7 @@ import sampleMarkdown from "./sample.md?raw";
 import { loadStoredSession, saveStoredSession, type StoredSession } from "./storage";
 import { parseNativeDocumentReferences } from "./native";
 import { replaceDocumentByName } from "./documents";
+import { createStartupGate } from "./startup";
 
 type BeforeInstallPromptEvent = Event & {
   prompt: () => Promise<void>;
@@ -82,6 +83,7 @@ app.innerHTML = `
         <div class="toolbar" aria-label="Document actions">
           <button class="button button-primary" id="open-button" type="button">Open file</button>
           <button class="button button-quiet" id="paste-button" type="button">Paste</button>
+          <button class="button button-quiet" id="pdf-button" type="button" aria-label="Export current document to PDF" title="Export current document to PDF">PDF</button>
           <button class="button button-quiet install-button" id="install-button" type="button" hidden>Install</button>
           <button class="icon-button" id="theme-button" type="button" aria-label="Switch color theme" title="Switch color theme">◐</button>
         </div>
@@ -138,6 +140,7 @@ const documentMeta = document.querySelector<HTMLElement>("#document-meta")!;
 const fileInput = document.querySelector<HTMLInputElement>("#file-input")!;
 const openButton = document.querySelector<HTMLButtonElement>("#open-button")!;
 const pasteButton = document.querySelector<HTMLButtonElement>("#paste-button")!;
+const pdfButton = document.querySelector<HTMLButtonElement>("#pdf-button")!;
 const installButton = document.querySelector<HTMLButtonElement>("#install-button")!;
 const themeButton = document.querySelector<HTMLButtonElement>("#theme-button")!;
 const dropZone = document.querySelector<HTMLElement>("#drop-zone")!;
@@ -161,6 +164,7 @@ let openDocuments: OpenDocument[] = [];
 let activeDocumentId = "";
 let persistenceQueue = Promise.resolve();
 let persistenceWarningShown = false;
+const startupGate = createStartupGate();
 
 function showToast(message: string) {
   window.clearTimeout(toastTimer);
@@ -383,6 +387,7 @@ function removeDemoDocumentBeforeNativeOpen() {
 }
 
 window.mdViewerOpenNativeDocuments = async (value: unknown) => {
+  await startupGate.wait();
   const documents = parseNativeDocumentReferences(value);
   if (!documents.length) return;
 
@@ -627,6 +632,60 @@ pasteButton.addEventListener("click", async () => {
   }
 });
 
+async function writeClipboard(text: string) {
+  if (navigator.clipboard?.writeText) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return;
+    } catch {
+      // Fall back for WebViews and browsers that expose the API but deny the request.
+    }
+  }
+
+  const temporary = document.createElement("textarea");
+  temporary.value = text;
+  temporary.setAttribute("readonly", "");
+  temporary.style.position = "fixed";
+  temporary.style.opacity = "0";
+  document.body.append(temporary);
+  try {
+    temporary.select();
+    if (!document.execCommand("copy")) throw new Error("Copy was rejected");
+  } finally {
+    temporary.remove();
+  }
+}
+
+output.addEventListener("click", async (event) => {
+  const button = (event.target as Element | null)?.closest<HTMLButtonElement>(".copy-code-button");
+  if (!button || !output.contains(button)) return;
+  const code = button.parentElement?.querySelector<HTMLElement>("pre code");
+  if (!code) return;
+
+  const text = code.textContent ?? "";
+  try {
+    await writeClipboard(text);
+    button.textContent = "Copied";
+    window.setTimeout(() => {
+      if (button.isConnected) button.textContent = "Copy";
+    }, 1600);
+  } catch {
+    showToast("Clipboard access was unavailable.");
+  }
+});
+
+pdfButton.addEventListener("click", () => {
+  const current = activeDocument();
+  if (!current) return;
+  if (isNativeApp) {
+    const printUrl = new URL("mdviewer://print");
+    printUrl.searchParams.set("name", current.name.replace(/\.[^.]+$/, "") || "MD Viewer");
+    window.location.href = printUrl.href;
+    return;
+  }
+  window.print();
+});
+
 for (const eventName of ["dragenter", "dragover"]) {
   dropZone.addEventListener(eventName, (event) => {
     event.preventDefault();
@@ -675,6 +734,7 @@ window.addEventListener("appinstalled", () => {
 
 if (window.launchQueue) {
   window.launchQueue.setConsumer(async (params) => {
+    await startupGate.wait();
     for (const handle of params.files ?? []) await openFile(await handle.getFile());
   });
 }
@@ -694,5 +754,9 @@ if (!isNativeApp) {
   });
 }
 
-if (!await restoreSession()) await addDocument(sampleMarkdown, "Welcome.md", "Demo document");
+try {
+  if (!await restoreSession()) await addDocument(sampleMarkdown, "Welcome.md", "Demo document");
+} finally {
+  startupGate.open();
+}
 if (!isNativeApp) await consumeSharedContent();

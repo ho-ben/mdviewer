@@ -10,6 +10,9 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.provider.OpenableColumns;
+import android.print.PrintAttributes;
+import android.print.PrintDocumentAdapter;
+import android.print.PrintManager;
 import android.util.Base64;
 import android.view.ViewGroup;
 import android.view.WindowInsets;
@@ -152,6 +155,10 @@ public final class MainActivity extends Activity {
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 Uri uri = request.getUrl();
+                if ("mdviewer".equals(uri.getScheme()) && "print".equals(uri.getHost())) {
+                    createPdfPrintJob(uri.getQueryParameter("name"));
+                    return true;
+                }
                 if (APP_ORIGIN.equals(uri.getScheme() + "://" + uri.getAuthority())) return false;
                 try {
                     startActivity(new Intent(Intent.ACTION_VIEW, uri));
@@ -201,6 +208,14 @@ public final class MainActivity extends Activity {
                 return true;
             }
         });
+    }
+
+    private void createPdfPrintJob(@Nullable String requestedName) {
+        if (webView == null) return;
+        String baseName = safeName(requestedName, "MD Viewer");
+        PrintManager printManager = (PrintManager) getSystemService(PRINT_SERVICE);
+        PrintDocumentAdapter adapter = webView.createPrintDocumentAdapter(baseName + ".pdf");
+        printManager.print(baseName + ".pdf", adapter, new PrintAttributes.Builder().build());
     }
 
     @Override

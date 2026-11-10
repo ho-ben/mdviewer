@@ -48,11 +48,7 @@ export default defineConfig({
           {
             action: "./",
             accept: {
-              "text/markdown": [".md", ".markdown", ".mdown", ".mkd"],
-              "text/plain": [".txt", ".text", ".log", ".out", ".err", ".csv", ".tsv", ".toml", ".ini", ".conf", ".cfg", ".properties", ".html", ".css", ".js", ".ts", ".py", ".rb", ".go", ".rs", ".java", ".kt", ".c", ".h", ".cpp", ".hpp", ".sh", ".sql", ".tex", ".diff", ".patch"],
-              "application/json": [".json", ".jsonl", ".ndjson"],
-              "application/xml": [".xml"],
-              "application/x-yaml": [".yaml", ".yml"]
+              "text/markdown": [".md", ".markdown", ".mdown", ".mkd"]
             }
           }
         ],

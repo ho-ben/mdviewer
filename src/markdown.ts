@@ -75,7 +75,10 @@ parser.renderer.rules.fence = (tokens, index, options, env, self) => {
   if (language === "mermaid") {
     return `<div class="mermaid">${escapeHtml(tokens[index].content)}</div>`;
   }
-  return defaultFence ? defaultFence(tokens, index, options, env, self) : self.renderToken(tokens, index, options);
+  const rendered = defaultFence
+    ? defaultFence(tokens, index, options, env, self)
+    : self.renderToken(tokens, index, options);
+  return `<div class="code-block"><button class="copy-code-button" type="button" aria-label="Copy code to clipboard">Copy</button>${rendered}</div>`;
 };
 
 const defaultLinkOpen = parser.renderer.rules.link_open
@@ -93,7 +96,7 @@ parser.renderer.rules.link_open = (tokens, index, options, env, self) => {
 export function renderMarkdown(source: string): string {
   return DOMPurify.sanitize(parser.render(source), {
     USE_PROFILES: { html: true, mathMl: true, svg: true, svgFilters: true },
-    ADD_ATTR: ["target", "rel", "class", "id", "aria-hidden", "role"],
+    ADD_ATTR: ["target", "rel", "class", "id", "aria-hidden", "aria-label", "role", "type"],
     FORBID_TAGS: ["script", "style", "iframe", "object", "embed"],
     FORBID_ATTR: ["onerror", "onload"]
   });
