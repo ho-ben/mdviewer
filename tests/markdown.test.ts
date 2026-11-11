@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { renderMarkdown, renderPlainText } from "../src/markdown";
 import { parseSharedFormData } from "../src/share";
 import { parseNativeDocumentReferences } from "../src/native";
-import { isCloseTabShortcut, replaceDocumentByName } from "../src/documents";
+import { isCloseTabShortcut, removeWelcomeDemoDocuments, replaceDocumentByName } from "../src/documents";
 import { createStartupGate } from "../src/startup";
 
 describe("Markdown rendering", () => {
@@ -134,6 +134,29 @@ describe("Reopening documents", () => {
 
     expect(replaceDocumentByName(documents, "notes-2.md", "new", "Android Markdown")).toBeUndefined();
     expect(documents[0].source).toBe("old");
+  });
+});
+
+describe("Welcome document", () => {
+  it("removes the demo without disturbing real open documents", () => {
+    const documents = [
+      { id: "document-1", name: "Welcome.md", kind: "Demo document" },
+      { id: "document-2", name: "notes.txt", kind: "Local text file" }
+    ];
+
+    expect(removeWelcomeDemoDocuments(documents)).toBe(true);
+    expect(documents).toEqual([
+      { id: "document-2", name: "notes.txt", kind: "Local text file" }
+    ]);
+  });
+
+  it("leaves a real file named Welcome.md open", () => {
+    const documents = [
+      { id: "document-1", name: "Welcome.md", kind: "Local Markdown" }
+    ];
+
+    expect(removeWelcomeDemoDocuments(documents)).toBe(false);
+    expect(documents).toHaveLength(1);
   });
 });
 

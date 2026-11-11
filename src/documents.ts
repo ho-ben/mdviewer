@@ -5,6 +5,20 @@ export type ReplaceableDocument = {
   scrollY: number;
 };
 
+type NamedDocument = Pick<ReplaceableDocument, "kind" | "name">;
+
+export function removeWelcomeDemoDocuments<T extends NamedDocument>(documents: T[]): boolean {
+  let removed = false;
+  for (let index = documents.length - 1; index >= 0; index -= 1) {
+    const document = documents[index];
+    if (document.kind === "Demo document" && document.name === "Welcome.md") {
+      documents.splice(index, 1);
+      removed = true;
+    }
+  }
+  return removed;
+}
+
 export function isCloseTabShortcut(
   event: Pick<KeyboardEvent, "altKey" | "code" | "ctrlKey" | "metaKey" | "repeat">
 ): boolean {

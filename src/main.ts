@@ -6,7 +6,7 @@ import { renderMarkdown, renderPlainText } from "./markdown";
 import sampleMarkdown from "./sample.md?raw";
 import { loadStoredSession, saveStoredSession, type StoredSession } from "./storage";
 import { parseNativeDocumentReferences } from "./native";
-import { isCloseTabShortcut, replaceDocumentByName } from "./documents";
+import { isCloseTabShortcut, removeWelcomeDemoDocuments, replaceDocumentByName } from "./documents";
 import { createStartupGate } from "./startup";
 
 type BeforeInstallPromptEvent = Event & {
@@ -237,6 +237,9 @@ async function restoreSession(): Promise<boolean> {
   try {
     const stored = await loadStoredSession();
     const documents = stored?.documents.filter(validStoredDocument).slice(0, 100) ?? [];
+    if (documents.some((document) => document.kind !== "Demo document" && isMarkdownName(document.name))) {
+      removeWelcomeDemoDocuments(documents);
+    }
     if (!documents.length) return false;
 
     openDocuments = documents;
@@ -352,6 +355,9 @@ async function addDocument(
   replaceExistingName = false
 ): Promise<"added" | "replaced"> {
   rememberActiveScroll();
+  if (kind !== "Demo document" && isMarkdownName(name)) {
+    removeWelcomeDemoDocuments(openDocuments);
+  }
   if (replaceExistingName) {
     const existing = replaceDocumentByName(openDocuments, name, source, kind);
     if (existing) {
@@ -378,20 +384,11 @@ async function addDocument(
   return "added";
 }
 
-function removeDemoDocumentBeforeNativeOpen() {
-  if (openDocuments.length !== 1) return;
-  const onlyDocument = openDocuments[0];
-  if (onlyDocument.kind !== "Demo document" || onlyDocument.name !== "Welcome.md") return;
-  openDocuments = [];
-  activeDocumentId = "";
-}
-
 window.mdViewerOpenNativeDocuments = async (value: unknown) => {
   await startupGate.wait();
   const documents = parseNativeDocumentReferences(value);
   if (!documents.length) return;
 
-  removeDemoDocumentBeforeNativeOpen();
   for (const document of documents) {
     try {
       const response = await fetch(`${location.origin}/native/${encodeURIComponent(document.id)}`, {
